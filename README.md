@@ -19,7 +19,7 @@ A local web interface for [Claude Code](https://docs.anthropic.com/en/docs/claud
 ## Quick Start
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/claude-web-ui.git
+git clone https://github.com/alloevil/claude-web-ui.git
 cd claude-web-ui
 bash start.sh
 ```
