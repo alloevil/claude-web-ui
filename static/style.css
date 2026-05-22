@@ -290,6 +290,44 @@ html, body {
   padding: 0;
 }
 
+.user-preview {
+  font-family: var(--font);
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.user-toggle {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.7;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.user-toggle:hover {
+  opacity: 1;
+}
+
+.user-full-output {
+  display: none;
+  margin-top: 8px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 400px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.user-full-output.open {
+  display: block;
+}
+
 /* ─── Tool calls ──────────────────────────────────────────────────────── */
 
 .tool-block {

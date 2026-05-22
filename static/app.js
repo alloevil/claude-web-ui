@@ -278,8 +278,6 @@ function finishResult(msg) {
   toolBlocks = {};
 
   if (msg.result && currentAssistantEl) {
-    // If there's a final result text, ensure it's shown
-    const bubble = currentAssistantEl.querySelector(".message-bubble");
     const existingText = currentTextEl?.textContent?.trim() || "";
     if (msg.result.trim() && msg.result.trim() !== existingText) {
       // The result might be the final accumulated text
@@ -333,6 +331,42 @@ function scrollToBottom() {
 
 // ─── Send ──────────────────────────────────────────────────────────────
 
+function createUserBubble(text) {
+  const bubble = document.createElement("div");
+  bubble.className = "message-bubble";
+
+  // Detect terminal/long output: has newlines, error traces, or is long
+  const isTerminalOutput = text.includes("\n") && text.length > 150;
+
+  if (isTerminalOutput) {
+    // Show a short preview, collapsible full content
+    const preview = document.createElement("div");
+    preview.className = "user-preview";
+    const firstLine = text.split("\n")[0];
+    preview.textContent = firstLine.length > 80 ? firstLine.slice(0, 80) + "..." : firstLine;
+    bubble.appendChild(preview);
+
+    const toggle = document.createElement("span");
+    toggle.className = "user-toggle";
+    toggle.textContent = "Show full output";
+    bubble.appendChild(toggle);
+
+    const fullBlock = document.createElement("pre");
+    fullBlock.className = "user-full-output";
+    fullBlock.textContent = text;
+    bubble.appendChild(fullBlock);
+
+    toggle.onclick = () => {
+      const isOpen = fullBlock.classList.toggle("open");
+      toggle.textContent = isOpen ? "Hide" : "Show full output";
+    };
+  } else {
+    bubble.textContent = text;
+  }
+
+  return bubble;
+}
+
 function sendMessage() {
   const input = $("#input");
   const text = input.value.trim();
@@ -341,7 +375,7 @@ function sendMessage() {
   // Render user message
   const el = document.createElement("div");
   el.className = "message user";
-  el.innerHTML = `<div class="message-bubble">${escapeHtml(text)}</div>`;
+  el.appendChild(createUserBubble(text));
   $("#messages").appendChild(el);
   scrollToBottom();
 
@@ -371,7 +405,7 @@ async function loadHistory(sessionId) {
         if (!text) return;
         const el = document.createElement("div");
         el.className = "message user";
-        el.innerHTML = `<div class="message-bubble">${escapeHtml(text)}</div>`;
+        el.appendChild(createUserBubble(text));
         container.appendChild(el);
       } else if (msg.role === "assistant" && msg.blocks) {
         const el = document.createElement("div");
