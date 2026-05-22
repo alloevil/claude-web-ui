@@ -2,6 +2,8 @@
 
 A local web interface for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Anthropic's agentic coding tool. Chat with Claude Code through a browser with streaming responses, session management, and tool call visualization.
 
+![screenshot](screenshot.png)
+
 ## Features
 
 - **Real-time streaming** - See Claude's responses as they're generated
