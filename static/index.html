@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Code Web UI</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <h1>Claude Code</h1>
+        <button id="btn-new-session" title="New Session">+</button>
+      </div>
+      <div id="session-list" class="session-list"></div>
+    </aside>
+
+    <!-- Main chat area -->
+    <main id="main">
+      <!-- Empty state -->
+      <div id="empty-state" class="empty-state">
+        <div class="empty-icon">></div>
+        <h2>Claude Code Web UI</h2>
+        <p>Create a new session to start chatting with Claude Code</p>
+        <button id="btn-new-empty">New Session</button>
+      </div>
+
+      <!-- Chat view -->
+      <div id="chat-view" class="chat-view hidden">
+        <div id="chat-header" class="chat-header">
+          <span id="chat-title">Session</span>
+          <button id="btn-delete" class="btn-icon" title="Delete Session">&#128465;</button>
+        </div>
+        <div id="messages" class="messages"></div>
+        <div id="input-area" class="input-area">
+          <textarea id="input" placeholder="Send a message to Claude Code..." rows="1"></textarea>
+          <button id="btn-send" title="Send">&#9654;</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
