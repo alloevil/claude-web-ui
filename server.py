@@ -270,6 +270,24 @@ def _serialize_session_message(msg: Any) -> dict:
     elif isinstance(message, UserMessage):
         if isinstance(message.content, str):
             result["content"] = message.content
+    elif isinstance(message, dict):
+        # Raw dict from SDK - extract content directly
+        content = message.get("content", "")
+        if isinstance(content, str):
+            result["content"] = content
+        elif isinstance(content, list):
+            blocks = []
+            for block in content:
+                if isinstance(block, dict):
+                    if block.get("type") == "text":
+                        blocks.append({"type": "text", "text": block.get("text", "")})
+                    elif block.get("type") == "tool_use":
+                        blocks.append({"type": "tool_use", "name": block.get("name", ""), "input": block.get("input", {})})
+                elif isinstance(block, TextBlock):
+                    blocks.append({"type": "text", "text": block.text})
+            result["blocks"] = blocks
+        else:
+            result["content"] = str(content)
     elif message is not None:
         result["content"] = str(message)
 
