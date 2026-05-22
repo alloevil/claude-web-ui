@@ -223,54 +223,26 @@ function appendThinking(text) {
 function startToolBlock(toolId, name, input) {
   ensureAssistantMessage();
 
-  const block = document.createElement("div");
-  block.className = "tool-block";
-  block.dataset.toolId = toolId;
-
-  const header = document.createElement("div");
-  header.className = "tool-header";
-  header.innerHTML = `
-    <span class="tool-icon">&#9881;</span>
-    <span class="tool-name">${escapeHtml(name)}</span>
-    <span class="tool-summary">${input ? summarizeToolInput(name, input) : ""}</span>
-    <span class="tool-arrow">&#9654;</span>
-  `;
-
-  const content = document.createElement("div");
-  content.className = "tool-content";
-  if (input) {
-    content.textContent = JSON.stringify(input, null, 2);
-  }
-
-  header.onclick = () => {
-    header.classList.toggle("open");
-    content.classList.toggle("open");
-  };
-
-  block.appendChild(header);
-  block.appendChild(content);
+  const el = createToolCallEl(name, input);
+  el.dataset.toolId = toolId;
 
   const bubble = currentAssistantEl.querySelector(".message-bubble");
-  bubble.appendChild(block);
-  toolBlocks[toolId] = { header, content, block };
+  bubble.appendChild(el);
+  toolBlocks[toolId] = { block: el };
 }
 
 function finishToolBlock(toolUseId, content, isError) {
   const tb = toolBlocks[toolUseId];
   if (!tb) return;
 
+  const displayContent = typeof content === "string" ? content : JSON.stringify(content, null, 2);
+  if (!displayContent) return;
+
   const resultEl = document.createElement("div");
-  resultEl.className = "tool-result" + (isError ? " error" : "");
-  let displayContent = typeof content === "string" ? content : JSON.stringify(content, null, 2);
-  // Try to format JSON in tool results
-  displayContent = formatJsonString(displayContent);
-  // Truncate very long results
-  if (displayContent.length > 2000) {
-    displayContent = displayContent.slice(0, 2000) + "\n... (truncated)";
-  }
-  resultEl.textContent = displayContent;
+  resultEl.className = "tool-call-result" + (isError ? " error" : "");
+  const truncated = displayContent.length > 1000 ? displayContent.slice(0, 1000) + "\n..." : displayContent;
+  resultEl.textContent = truncated;
   tb.block.appendChild(resultEl);
-  tb.resultEl = resultEl;
 }
 
 function finishResult(msg) {
@@ -333,6 +305,53 @@ function resetCurrent() {
 function scrollToBottom() {
   const container = $("#messages");
   container.scrollTop = container.scrollHeight;
+}
+
+// ─── Tool call display ────────────────────────────────────────────────
+
+const TOOL_DESCRIPTIONS = {
+  Read: (input) => `Reading ${input.file_path || "file"}`,
+  Write: (input) => `Writing ${input.file_path || "file"}`,
+  Edit: (input) => `Editing ${input.file_path || "file"}`,
+  Bash: (input) => `Running: ${input.command || ""}`,
+  Glob: (input) => `Searching files: ${input.pattern || ""}`,
+  Grep: (input) => `Searching content: ${input.query || input.pattern || ""}`,
+  Agent: (input) => `Spawning sub-agent: ${(input.prompt || "").slice(0, 60)}`,
+  WebFetch: (input) => `Fetching: ${input.url || ""}`,
+  WebSearch: (input) => `Searching: ${input.query || ""}`,
+  TodoRead: () => `Reading task list`,
+  TodoWrite: () => `Updating task list`,
+  NotebookEdit: (input) => `Editing notebook: ${input.notebook_path || ""}`,
+};
+
+function createToolCallEl(name, input) {
+  const el = document.createElement("div");
+  el.className = "tool-call";
+
+  const desc = TOOL_DESCRIPTIONS[name];
+  const summary = desc ? desc(input) : `Using ${name}`;
+
+  const header = document.createElement("div");
+  header.className = "tool-call-header";
+  header.innerHTML = `<span class="tool-call-icon">⚙</span> <span class="tool-call-text">${escapeHtml(summary)}</span>`;
+
+  // Collapsible detail with original input
+  const detail = document.createElement("div");
+  detail.className = "tool-call-detail";
+  if (input) {
+    const pre = document.createElement("pre");
+    pre.textContent = JSON.stringify(input, null, 2);
+    detail.appendChild(pre);
+  }
+
+  header.onclick = () => {
+    header.classList.toggle("open");
+    detail.classList.toggle("open");
+  };
+
+  el.appendChild(header);
+  el.appendChild(detail);
+  return el;
 }
 
 // ─── JSON formatting ───────────────────────────────────────────────────
@@ -496,44 +515,28 @@ async function loadHistory(sessionId) {
         el.className = "message user";
         el.appendChild(createUserBubble(text));
         container.appendChild(el);
-      } else if (msg.role === "assistant" && msg.blocks) {
+      } else if (msg.role === "assistant") {
         const el = document.createElement("div");
         el.className = "message assistant";
         const bubble = document.createElement("div");
         bubble.className = "message-bubble";
-        msg.blocks.forEach((block) => {
-          if (block.type === "text") {
-            const span = document.createElement("span");
-            span.textContent = block.text;
-            bubble.appendChild(span);
-          } else if (block.type === "tool_use") {
-            const tb = document.createElement("div");
-            tb.className = "tool-block";
-            const header = document.createElement("div");
-            header.className = "tool-header";
-            header.innerHTML = `
-              <span class="tool-icon">&#9881;</span>
-              <span class="tool-name">${escapeHtml(block.name)}</span>
-              <span class="tool-summary">${summarizeToolInput(block.name, block.input)}</span>
-              <span class="tool-arrow">&#9654;</span>
-            `;
-            const content = document.createElement("div");
-            content.className = "tool-content";
-            content.textContent = JSON.stringify(block.input, null, 2);
-            header.onclick = () => {
-              header.classList.toggle("open");
-              content.classList.toggle("open");
-            };
-            tb.appendChild(header);
-            tb.appendChild(content);
-            bubble.appendChild(tb);
-          } else if (block.type === "tool_result") {
-            const resultEl = document.createElement("div");
-            resultEl.className = "tool-result" + (block.is_error ? " error" : "");
-            resultEl.textContent = formatJsonString((block.content || "").slice(0, 2000));
-            bubble.appendChild(resultEl);
-          }
-        });
+
+        if (msg.blocks) {
+          msg.blocks.forEach((block) => {
+            if (block.type === "text") {
+              const span = document.createElement("span");
+              span.textContent = block.text;
+              bubble.appendChild(span);
+            } else if (block.type === "tool_use") {
+              bubble.appendChild(createToolCallEl(block.name, block.input));
+            }
+          });
+        } else if (msg.content) {
+          const span = document.createElement("span");
+          span.textContent = msg.content;
+          bubble.appendChild(span);
+        }
+
         formatJsonInElement(bubble);
         el.appendChild(bubble);
         container.appendChild(el);

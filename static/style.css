@@ -328,6 +328,84 @@ html, body {
   display: block;
 }
 
+/* ─── Tool calls (clean) ─────────────────────────────────────────────── */
+
+.tool-call {
+  margin: 6px 0;
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+}
+
+.tool-call-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.tool-call-header:hover {
+  color: var(--text-primary);
+}
+
+.tool-call-icon {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.tool-call-text {
+  font-family: var(--font);
+  font-size: 12px;
+}
+
+.tool-call-header.open .tool-call-text {
+  color: var(--accent);
+}
+
+.tool-call-detail {
+  display: none;
+  margin-top: 4px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tool-call-detail.open {
+  display: block;
+}
+
+.tool-call-detail pre {
+  font-family: var(--font);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
+.tool-call-result {
+  font-family: var(--font);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius);
+  max-height: 150px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.tool-call-result.error {
+  color: var(--error);
+}
+
 /* ─── JSON formatting ─────────────────────────────────────────────────── */
 
 .json-block {
@@ -354,85 +432,6 @@ html, body {
 .json-boolean { color: #ff7b72; }
 .json-null { color: #ff7b72; }
 
-/* ─── Tool calls ──────────────────────────────────────────────────────── */
-
-.tool-block {
-  margin: 8px 0;
-  border: 1px solid var(--tool-border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.tool-header {
-  padding: 8px 12px;
-  background: var(--tool-bg);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-family: var(--font);
-  color: var(--text-secondary);
-  user-select: none;
-}
-
-.tool-header:hover {
-  background: rgba(124, 92, 252, 0.1);
-}
-
-.tool-header .tool-icon {
-  font-size: 14px;
-}
-
-.tool-header .tool-name {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.tool-header .tool-arrow {
-  margin-left: auto;
-  transition: transform 0.15s;
-}
-
-.tool-header.open .tool-arrow {
-  transform: rotate(90deg);
-}
-
-.tool-content {
-  display: none;
-  padding: 12px;
-  background: var(--bg-primary);
-  font-family: var(--font);
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text-secondary);
-  max-height: 300px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.tool-content.open {
-  display: block;
-}
-
-.tool-result {
-  border-top: 1px solid var(--tool-border);
-  padding: 12px;
-  background: var(--bg-primary);
-  font-family: var(--font);
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text-secondary);
-  max-height: 200px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.tool-result.error {
-  color: var(--error);
-}
 
 /* ─── Input ───────────────────────────────────────────────────────────── */
 
