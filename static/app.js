@@ -261,13 +261,14 @@ function finishToolBlock(toolUseId, content, isError) {
 
   const resultEl = document.createElement("div");
   resultEl.className = "tool-result" + (isError ? " error" : "");
-  const displayContent = typeof content === "string" ? content : JSON.stringify(content, null, 2);
+  let displayContent = typeof content === "string" ? content : JSON.stringify(content, null, 2);
+  // Try to format JSON in tool results
+  displayContent = formatJsonString(displayContent);
   // Truncate very long results
   if (displayContent.length > 2000) {
-    resultEl.textContent = displayContent.slice(0, 2000) + "\n... (truncated)";
-  } else {
-    resultEl.textContent = displayContent;
+    displayContent = displayContent.slice(0, 2000) + "\n... (truncated)";
   }
+  resultEl.textContent = displayContent;
   tb.block.appendChild(resultEl);
   tb.resultEl = resultEl;
 }
@@ -286,6 +287,11 @@ function finishResult(msg) {
         currentTextEl.textContent = msg.result;
       }
     }
+  }
+
+  // Format any JSON in the message
+  if (currentAssistantEl) {
+    formatJsonInElement(currentAssistantEl.querySelector(".message-bubble"));
   }
 
   // Add result footer
@@ -327,6 +333,89 @@ function resetCurrent() {
 function scrollToBottom() {
   const container = $("#messages");
   container.scrollTop = container.scrollHeight;
+}
+
+// ─── JSON formatting ───────────────────────────────────────────────────
+
+function formatJsonInElement(el) {
+  // Walk text nodes and wrap JSON blocks in <pre><code>
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+  for (const node of textNodes) {
+    const text = node.textContent;
+    // Try to find JSON objects/arrays in the text
+    const jsonPattern = /(\{[\s\S]*?\}|\[[\s\S]*?\])/g;
+    let match;
+    let lastIndex = 0;
+    let hasJson = false;
+    const fragment = document.createDocumentFragment();
+
+    while ((match = jsonPattern.exec(text)) !== null) {
+      try {
+        const parsed = JSON.parse(match[0]);
+        hasJson = true;
+        // Add text before JSON
+        if (match.index > lastIndex) {
+          fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+        }
+        // Create formatted JSON block with syntax highlighting
+        const pre = document.createElement("pre");
+        pre.className = "json-block";
+        const code = document.createElement("code");
+        code.innerHTML = highlightJson(JSON.stringify(parsed, null, 2));
+        pre.appendChild(code);
+        fragment.appendChild(pre);
+        lastIndex = match.index + match[0].length;
+      } catch (e) {
+        // Not valid JSON, skip
+      }
+    }
+
+    if (hasJson) {
+      // Add remaining text
+      if (lastIndex < text.length) {
+        fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+      }
+      node.parentNode.replaceChild(fragment, node);
+    }
+  }
+}
+
+function formatJsonString(text) {
+  try {
+    const parsed = JSON.parse(text);
+    return JSON.stringify(parsed, null, 2);
+  } catch (e) {
+    return text;
+  }
+}
+
+function highlightJson(json) {
+  // Escape HTML first, then add syntax highlighting spans
+  const escaped = json
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  return escaped.replace(
+    /("(?:\\.|[^"\\])*")\s*(:)?|(\b(?:true|false)\b)|(\bnull\b)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
+    (match, str, colon, bool, nil, num) => {
+      if (str) {
+        if (colon) {
+          // It's a key
+          return `<span class="json-key">${str}</span>:`;
+        }
+        // It's a string value
+        return `<span class="json-string">${str}</span>`;
+      }
+      if (bool) return `<span class="json-boolean">${bool}</span>`;
+      if (nil) return `<span class="json-null">${nil}</span>`;
+      if (num) return `<span class="json-number">${num}</span>`;
+      return match;
+    }
+  );
 }
 
 // ─── Send ──────────────────────────────────────────────────────────────
@@ -441,10 +530,11 @@ async function loadHistory(sessionId) {
           } else if (block.type === "tool_result") {
             const resultEl = document.createElement("div");
             resultEl.className = "tool-result" + (block.is_error ? " error" : "");
-            resultEl.textContent = (block.content || "").slice(0, 2000);
+            resultEl.textContent = formatJsonString((block.content || "").slice(0, 2000));
             bubble.appendChild(resultEl);
           }
         });
+        formatJsonInElement(bubble);
         el.appendChild(bubble);
         container.appendChild(el);
       }

@@ -328,6 +328,32 @@ html, body {
   display: block;
 }
 
+/* ─── JSON formatting ─────────────────────────────────────────────────── */
+
+.json-block {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  margin: 6px 0;
+  overflow-x: auto;
+  border-left: 3px solid var(--accent);
+}
+
+.json-block code {
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.5;
+  color: #c9d1d9;
+  white-space: pre;
+}
+
+/* JSON syntax colors */
+.json-key { color: #79c0ff; }
+.json-string { color: #a5d6ff; }
+.json-number { color: #f2cc60; }
+.json-boolean { color: #ff7b72; }
+.json-null { color: #ff7b72; }
+
 /* ─── Tool calls ──────────────────────────────────────────────────────── */
 
 .tool-block {
