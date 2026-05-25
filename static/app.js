@@ -68,6 +68,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Scroll lock: detect user scrolling up
+  $("#messages").addEventListener("scroll", () => {
+    _userScrolledUp = !isNearBottom();
+    const btn = $("#btn-scroll-bottom");
+    if (btn) btn.classList.toggle("hidden", !_userScrolledUp);
+  });
+  $("#btn-scroll-bottom").onclick = () => {
+    _userScrolledUp = false;
+    scrollToBottom(true);
+  };
+
   loadSessions();
   fetchStatus();
 });
@@ -474,6 +485,7 @@ async function deleteCurrentSession() {
 function switchSession(sessionId) {
   if (isStreaming) return;
   currentSessionId = sessionId;
+  _userScrolledUp = false;
   loadSessionStatus(sessionId);
   disconnectWS();
   connectWS(sessionId);
@@ -521,7 +533,7 @@ function showEmpty() {
 function showChat() {
   $("#empty-state").classList.add("hidden");
   $("#chat-view").classList.remove("hidden");
-  $("#messages").innerHTML = "";
+  $("#messages").innerHTML = '<div class="loading-history"><div class="loading-dots"><span></span><span></span><span></span></div></div>';
   $("#input").focus();
 }
 
@@ -590,15 +602,38 @@ async function confirmCwd() {
 
 // ─── WebSocket ─────────────────────────────────────────────────────────
 
+let _reconnectAttempts = 0;
+let _reconnectTimer = null;
+let _wsSessionId = null;
+
 function connectWS(sessionId) {
+  _wsSessionId = sessionId;
+  _reconnectAttempts = 0;
+  _connectWSInternal();
+}
+
+function _connectWSInternal() {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  ws = new WebSocket(`${proto}//${location.host}/ws/${sessionId}`);
-  ws.onmessage = (e) => handleWSMessage(JSON.parse(e.data));
-  ws.onclose = () => { if (isStreaming) finishStreaming(); };
+  ws = new WebSocket(`${proto}//${location.host}/ws/${_wsSessionId}`);
+  ws.onmessage = (e) => {
+    _reconnectAttempts = 0;
+    handleWSMessage(JSON.parse(e.data));
+  };
+  ws.onclose = () => {
+    if (isStreaming) finishStreaming();
+    if (_wsSessionId && _reconnectAttempts < 5) {
+      const delay = Math.min(1000 * Math.pow(2, _reconnectAttempts), 30000);
+      _reconnectAttempts++;
+      console.log(`[ws] Reconnecting in ${delay}ms (attempt ${_reconnectAttempts})`);
+      _reconnectTimer = setTimeout(_connectWSInternal, delay);
+    }
+  };
   ws.onerror = (e) => console.error("WebSocket error", e);
 }
 
 function disconnectWS() {
+  _wsSessionId = null;
+  if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
   if (ws) { ws.close(); ws = null; }
   finishStreaming();
 }
@@ -728,12 +763,21 @@ function ensureBubble() {
   return bubble;
 }
 
+let _renderRaf = null;
+
 function appendText(text) {
   if (!text) return;
   ensureBubble();
   if (!currentTextEl._raw) currentTextEl._raw = "";
   currentTextEl._raw += text;
-  currentTextEl.innerHTML = marked.parse(currentTextEl._raw);
+  if (!_renderRaf) {
+    _renderRaf = requestAnimationFrame(() => {
+      _renderRaf = null;
+      if (currentTextEl) {
+        currentTextEl.innerHTML = marked.parse(currentTextEl._raw);
+      }
+    });
+  }
 }
 
 function appendThinking(text) {
@@ -850,9 +894,22 @@ function resetCurrent() {
   currentTextEl = null;
 }
 
-function scrollToBottom() {
-  const container = $("#messages");
-  container.scrollTop = container.scrollHeight;
+let _scrollRaf = null;
+let _userScrolledUp = false;
+
+function scrollToBottom(force) {
+  if (_userScrolledUp && !force) return;
+  if (_scrollRaf) return;
+  _scrollRaf = requestAnimationFrame(() => {
+    _scrollRaf = null;
+    const container = $("#messages");
+    container.scrollTop = container.scrollHeight;
+  });
+}
+
+function isNearBottom() {
+  const c = $("#messages");
+  return c.scrollHeight - c.scrollTop - c.clientHeight < 80;
 }
 
 // ─── Code block copy buttons ───────────────────────────────────────────
@@ -936,6 +993,9 @@ function getToolIcon(name) {
     Bash: "\u{1F4BB}", Glob: "\u{1F50D}", Grep: "\u{1F50E}",
     Agent: "\u{1F916}", WebFetch: "\u{1F310}", WebSearch: "\u{1F52E}",
     TodoRead: "\u{1F4CB}", TodoWrite: "\u{2705}", NotebookEdit: "\u{1F4D3}",
+    TaskCreate: "\u{1F4DD}", TaskUpdate: "\u{1F504}", TaskList: "\u{1F4CB}",
+    TaskGet: "\u{1F50D}", LSP: "\u{1F4A1}", Skill: "\u{26A1}",
+    Monitor: "\u{1F4E1}", CronCreate: "\u{23F0}",
   };
   return icons[name] || "⚙️";
 }
@@ -945,6 +1005,14 @@ function getToolIcon(name) {
 function createUserBubble(text) {
   const bubble = document.createElement("div");
   bubble.className = "message-bubble";
+  bubble.dataset.text = text;
+  bubble.title = "Click to re-edit";
+  bubble.onclick = () => {
+    const input = $("#input");
+    input.value = bubble.dataset.text;
+    input.focus();
+    autoResize();
+  };
 
   const isTerminalOutput = text.includes("\n") && text.length > 150;
 
@@ -976,6 +1044,14 @@ function createUserBubble(text) {
   return bubble;
 }
 
+function appendUserMessage(text) {
+  const el = document.createElement("div");
+  el.className = "message user";
+  el.appendChild(createUserBubble(text));
+  $("#messages").appendChild(el);
+  scrollToBottom();
+}
+
 function sendMessage() {
   const input = $("#input");
   const text = input.value.trim();
@@ -994,12 +1070,7 @@ function sendMessage() {
   saveToHistory(text);
   historyIndex = -1;
 
-  // Render user message
-  const el = document.createElement("div");
-  el.className = "message user";
-  el.appendChild(createUserBubble(text));
-  $("#messages").appendChild(el);
-  scrollToBottom();
+  appendUserMessage(text);
 
   // Send via WebSocket
   ws.send(JSON.stringify({ type: "message", content: text }));
@@ -1026,12 +1097,7 @@ async function handleSlashCommand(text) {
   const parts = text.split(/\s+/);
   const cmd = parts[0].slice(1).toLowerCase();
 
-  // Show user message in chat
-  const el = document.createElement("div");
-  el.className = "message user";
-  el.appendChild(createUserBubble(text));
-  $("#messages").appendChild(el);
-  scrollToBottom();
+  appendUserMessage(text);
 
   // Local commands
   if (cmd === "clear") {
@@ -1426,7 +1492,9 @@ function autoResize() {
 }
 
 function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
