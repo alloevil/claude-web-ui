@@ -7,10 +7,14 @@ Sessions are managed through the SDK's built-in session management.
 
 import asyncio
 import json
+import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("claude-web-ui")
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -48,7 +52,9 @@ async def api_list_sessions():
     """List all sessions with metadata."""
     try:
         sdk_sessions = list_sessions()
-    except Exception:
+        logger.info(f"SDK returned {len(sdk_sessions)} sessions")
+    except Exception as e:
+        logger.error(f"list_sessions failed: {e}")
         sdk_sessions = []
 
     sdk_ids = set()
@@ -104,14 +110,16 @@ async def api_delete_session(session_id: str):
 @app.get("/api/sessions/{session_id}/messages")
 async def api_get_messages(session_id: str):
     """Get message history for a session."""
+    logger.info(f"Loading messages for session: {session_id}")
     try:
         messages = get_session_messages(session_id)
+        logger.info(f"Got {len(messages)} messages for session {session_id[:12]}...")
         result = []
         for msg in messages:
             result.append(_serialize_session_message(msg))
         return result
-    except Exception:
-        # Session might not exist in SDK yet (new/pending session)
+    except Exception as e:
+        logger.error(f"get_session_messages({session_id[:12]}...) failed: {e}")
         return []
 
 
@@ -178,6 +186,7 @@ async def _handle_chat(ws: WebSocket, session_id: str, user_text: str):
             if isinstance(message, ResultMessage) and message.session_id:
                 sdk_id = message.session_id
                 sessions_meta.setdefault(session_id, {})["sdk_session_id"] = sdk_id
+                logger.info(f"SDK session created: {sdk_id} (was {session_id[:12]}...)")
                 # Notify frontend of the real SDK session ID
                 await ws.send_json({
                     "type": "session_ready",
@@ -188,6 +197,7 @@ async def _handle_chat(ws: WebSocket, session_id: str, user_text: str):
                 sid = message.data.get("session_id")
                 if sid:
                     sessions_meta.setdefault(session_id, {})["sdk_session_id"] = sid
+                    logger.info(f"SDK session init: {sid}")
             await _forward_message(ws, message, session_id)
     except Exception as e:
         await ws.send_json({"type": "error", "message": str(e)})

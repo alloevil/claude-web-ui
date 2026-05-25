@@ -39,9 +39,11 @@ document.addEventListener("DOMContentLoaded", () => {
 async function loadSessions() {
   const res = await fetch("/api/sessions");
   const sessions = await res.json();
+  console.log(`[loadSessions] Got ${sessions.length} sessions, currentSessionId=${currentSessionId}`);
   renderSessionList(sessions);
 
   if (sessions.length > 0 && !currentSessionId) {
+    console.log(`[loadSessions] Auto-switching to: ${sessions[0].session_id}`);
     switchSession(sessions[0].session_id);
   }
 }
@@ -500,9 +502,15 @@ function sendMessage() {
 
 async function loadHistory(sessionId) {
   try {
-    const res = await fetch(`/api/sessions/${sessionId}/messages`);
-    if (!res.ok) return;
+    const url = `/api/sessions/${sessionId}/messages`;
+    console.log(`[loadHistory] Fetching: ${url}`);
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn(`[loadHistory] Response not OK: ${res.status}`);
+      return;
+    }
     const messages = await res.json();
+    console.log(`[loadHistory] Got ${messages.length} messages`);
 
     const container = $("#messages");
     container.innerHTML = "";
