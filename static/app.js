@@ -165,6 +165,14 @@ function handleWSMessage(msg) {
     case "system":
       handleSystemMessage(msg);
       break;
+    case "session_ready":
+      // SDK assigned a real session ID
+      if (msg.session_id && msg.session_id !== currentSessionId) {
+        currentSessionId = msg.session_id;
+        // Refresh session list to pick up the new SDK session
+        loadSessions();
+      }
+      break;
     case "error":
       appendError(msg.message);
       break;

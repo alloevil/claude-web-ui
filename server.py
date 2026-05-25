@@ -51,9 +51,11 @@ async def api_list_sessions():
     except Exception:
         sdk_sessions = []
 
+    sdk_ids = set()
     result = []
     for s in sdk_sessions:
         sid = s.session_id
+        sdk_ids.add(sid)
         meta = sessions_meta.get(sid, {})
         result.append({
             "session_id": sid,
@@ -61,7 +63,18 @@ async def api_list_sessions():
             "created_at": meta.get("created_at", ""),
             "summary": s.summary,
         })
-    # Sort by created_at descending, fallback to SDK order
+
+    # Add pending sessions (created via UI but no messages sent yet)
+    for sid, meta in sessions_meta.items():
+        if sid not in sdk_ids and not meta.get("sdk_session_id"):
+            result.append({
+                "session_id": sid,
+                "name": meta.get("name", f"Session {sid[:8]}"),
+                "created_at": meta.get("created_at", ""),
+                "summary": "",
+                "pending": True,
+            })
+
     result.sort(key=lambda x: x["created_at"], reverse=True)
     return result
 
@@ -97,8 +110,9 @@ async def api_get_messages(session_id: str):
         for msg in messages:
             result.append(_serialize_session_message(msg))
         return result
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=404)
+    except Exception:
+        # Session might not exist in SDK yet (new/pending session)
+        return []
 
 
 # ─── WebSocket ──────────────────────────────────────────────────────────────────
@@ -162,7 +176,14 @@ async def _handle_chat(ws: WebSocket, session_id: str, user_text: str):
         async for message in query(prompt=user_text, options=options):
             # Capture the SDK's actual session ID for future resume
             if isinstance(message, ResultMessage) and message.session_id:
-                sessions_meta.setdefault(session_id, {})["sdk_session_id"] = message.session_id
+                sdk_id = message.session_id
+                sessions_meta.setdefault(session_id, {})["sdk_session_id"] = sdk_id
+                # Notify frontend of the real SDK session ID
+                await ws.send_json({
+                    "type": "session_ready",
+                    "session_id": sdk_id,
+                    "old_session_id": session_id,
+                })
             elif isinstance(message, SystemMessage) and message.subtype == "init":
                 sid = message.data.get("session_id")
                 if sid:
