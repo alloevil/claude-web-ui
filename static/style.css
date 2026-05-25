@@ -96,8 +96,9 @@ html, body {
   margin-bottom: 4px;
   transition: all 0.15s;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+  position: relative;
 }
 
 .session-item:hover {
@@ -112,15 +113,47 @@ html, body {
 .session-item .session-icon {
   font-size: 14px;
   opacity: 0.6;
+  margin-top: 2px;
+  flex-shrink: 0;
 }
 
 .session-item .session-name {
   font-size: 13px;
   color: var(--text-primary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
+  word-break: break-all;
+}
+
+/* Tooltip on hover for full name */
+.session-item::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 8px;
+  padding: 6px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: normal;
+  max-width: 300px;
+  word-break: break-all;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.session-item:hover::after {
+  opacity: 1;
 }
 
 /* ─── Main ────────────────────────────────────────────────────────────── */

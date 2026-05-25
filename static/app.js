@@ -81,6 +81,7 @@ function renderSessionList(sessions) {
     const el = document.createElement("div");
     el.className = "session-item" + (s.session_id === currentSessionId ? " active" : "");
     el.dataset.id = s.session_id;
+    el.dataset.tooltip = escapeHtml(s.name);
     el.innerHTML = `
       <span class="session-icon">&#9679;</span>
       <span class="session-name">${escapeHtml(s.name)}</span>
