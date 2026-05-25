@@ -242,6 +242,13 @@ html, body {
   flex-direction: column;
   min-height: 0;
   position: relative;
+  transition: outline 0.15s;
+}
+
+.chat-view.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+  background: rgba(124, 92, 252, 0.05);
 }
 
 .chat-header {
@@ -448,6 +455,30 @@ html, body {
   line-height: 1.5;
 }
 
+/* Line numbers */
+.line-numbers {
+  display: inline-block;
+  text-align: right;
+  padding-right: 12px;
+  margin-right: 12px;
+  border-right: 1px solid var(--border);
+  color: var(--text-muted);
+  user-select: none;
+  font-size: 12px;
+  line-height: 1.5;
+  vertical-align: top;
+}
+
+.has-line-numbers {
+  display: flex;
+  align-items: flex-start;
+}
+
+.has-line-numbers code {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Copy button on code blocks */
 .copy-btn {
   position: absolute;
@@ -601,6 +632,33 @@ html, body {
   white-space: pre-wrap;
   word-break: break-all;
   margin: 0;
+}
+
+/* Diff view for Edit tool */
+.diff-view {
+  font-family: var(--font);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.diff-line {
+  padding: 1px 8px;
+  white-space: pre;
+}
+
+.diff-line.diff-context {
+  color: var(--text-muted);
+}
+
+.diff-line.diff-remove {
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff8787;
+}
+
+.diff-line.diff-add {
+  background: rgba(81, 207, 102, 0.15);
+  color: #69db7c;
 }
 
 /* Tool result (collapsible) */
@@ -993,6 +1051,230 @@ html, body {
 
 .btn-primary:hover {
   background: var(--accent-hover);
+}
+
+.dialog-wide {
+  min-width: 500px;
+  max-width: 600px;
+}
+
+/* Command palette */
+.palette-dialog {
+  width: 500px;
+  max-width: 90vw;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.palette-dialog input {
+  width: 100%;
+  background: var(--bg-input);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 14px 16px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: var(--font-ui);
+  outline: none;
+}
+
+.palette-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.palette-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  transition: background 0.1s;
+}
+
+.palette-item:hover,
+.palette-item.selected {
+  background: rgba(124, 92, 252, 0.15);
+}
+
+.palette-icon {
+  font-size: 14px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.palette-label {
+  color: var(--text-primary);
+}
+
+#command-palette {
+  align-items: flex-start;
+  padding-top: 15vh;
+}
+
+/* Prompt library */
+.btn-prompts {
+  font-size: 18px;
+  padding: 4px 6px;
+  flex-shrink: 0;
+}
+
+.prompt-list {
+  max-height: 250px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.prompt-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+}
+
+.prompt-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  cursor: default;
+  transition: background 0.1s;
+}
+
+.prompt-item:hover {
+  background: rgba(124, 92, 252, 0.1);
+}
+
+.prompt-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 100px;
+  color: var(--text-primary);
+}
+
+.prompt-item-preview {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prompt-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.prompt-item-actions button {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.prompt-item-actions button:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.prompt-add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prompt-add input,
+.prompt-add textarea {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  outline: none;
+  resize: vertical;
+}
+
+.prompt-add input:focus,
+.prompt-add textarea:focus {
+  border-color: var(--accent);
+}
+
+.prompt-add button {
+  align-self: flex-end;
+}
+
+/* ─── Search bar ───────────────────────────────────────────────────────── */
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+}
+
+.search-bar input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  outline: none;
+}
+
+.search-bar input:focus {
+  border-color: var(--accent);
+}
+
+.search-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 50px;
+  text-align: center;
+}
+
+.search-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.search-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.search-highlight {
+  background: rgba(255, 215, 0, 0.3);
+  border-radius: 2px;
+}
+
+.search-highlight.search-active {
+  background: rgba(255, 215, 0, 0.7);
+  outline: 1px solid #ffd700;
 }
 
 /* ─── Scrollbar ───────────────────────────────────────────────────────── */

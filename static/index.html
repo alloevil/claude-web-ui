@@ -33,17 +33,26 @@
         <div id="chat-header" class="chat-header">
           <span id="chat-title">Session</span>
           <div class="chat-header-actions">
+            <button id="btn-export" class="btn-icon" title="Export as Markdown">&#128196;</button>
             <button id="btn-rename" class="btn-icon" title="Rename Session">&#9998;</button>
             <button id="btn-delete" class="btn-icon" title="Delete Session">&#128465;</button>
           </div>
         </div>
         <div id="messages" class="messages"></div>
+        <div id="search-bar" class="search-bar hidden">
+          <input id="search-input" type="text" placeholder="Search messages..." />
+          <span id="search-count" class="search-count"></span>
+          <button id="search-prev" class="search-btn" title="Previous">&#9650;</button>
+          <button id="search-next" class="search-btn" title="Next">&#9660;</button>
+          <button id="search-close" class="search-btn" title="Close">&times;</button>
+        </div>
         <button id="btn-scroll-bottom" class="btn-scroll-bottom hidden" title="Scroll to bottom">&#8595; New messages</button>
         <div id="loading-indicator" class="loading-indicator hidden">
           <div class="loading-dots"><span></span><span></span><span></span></div>
           <button id="btn-stop" class="btn-stop" title="Stop (Esc)">&#9632; Stop</button>
         </div>
         <div id="input-area" class="input-area">
+          <button id="btn-prompts" class="btn-icon btn-prompts" title="Prompt Library (Ctrl+P)">&#128218;</button>
           <div id="input-wrapper" class="input-wrapper">
             <div id="autocomplete" class="autocomplete-dropdown hidden"></div>
             <textarea id="input" placeholder="Send a message... (Enter to send, Shift+Enter for newline, / for commands)" rows="1"></textarea>
@@ -73,6 +82,30 @@
       <div class="dialog-actions">
         <button id="cwd-cancel" class="btn-secondary">Cancel</button>
         <button id="cwd-confirm" class="btn-primary">Set</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Command Palette -->
+  <div id="command-palette" class="dialog-overlay hidden">
+    <div class="palette-dialog">
+      <input id="palette-input" type="text" placeholder="Type a command or search..." />
+      <div id="palette-list" class="palette-list"></div>
+    </div>
+  </div>
+
+  <!-- Prompt Library Dialog -->
+  <div id="prompt-dialog" class="dialog-overlay hidden">
+    <div class="dialog dialog-wide">
+      <h3>Prompt Library</h3>
+      <div id="prompt-list" class="prompt-list"></div>
+      <div class="prompt-add">
+        <input id="prompt-name" type="text" placeholder="Prompt name" />
+        <textarea id="prompt-text" placeholder="Prompt content..." rows="3"></textarea>
+        <button id="prompt-save" class="btn-primary">Save</button>
+      </div>
+      <div class="dialog-actions">
+        <button id="prompt-close" class="btn-secondary">Close</button>
       </div>
     </div>
   </div>

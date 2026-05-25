@@ -50,6 +50,10 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#btn-delete").onclick = deleteCurrentSession;
   $("#btn-stop").onclick = stopStreaming;
   $("#btn-rename").onclick = renameCurrentSession;
+  $("#btn-export").onclick = exportChat;
+  $("#btn-prompts").onclick = openPromptLibrary;
+  $("#prompt-close").onclick = () => $("#prompt-dialog").classList.add("hidden");
+  $("#prompt-save").onclick = savePrompt;
 
   // CWD dialog
   $("#status-cwd").onclick = showCwdDialog;
@@ -79,6 +83,26 @@ document.addEventListener("DOMContentLoaded", () => {
     scrollToBottom(true);
   };
 
+  // Drag and drop files
+  const chatView = $("#chat-view");
+  if (chatView) {
+    chatView.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      chatView.classList.add("drag-over");
+    });
+    chatView.addEventListener("dragleave", (e) => {
+      e.preventDefault();
+      chatView.classList.remove("drag-over");
+    });
+    chatView.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      chatView.classList.remove("drag-over");
+      handleFileDrop(e.dataTransfer.files);
+    });
+  }
+
   loadSessions();
   fetchStatus();
 });
@@ -89,6 +113,7 @@ function handleGlobalKeydown(e) {
   if (e.key === "Escape") {
     if (isStreaming) { stopStreaming(); e.preventDefault(); }
     if (acMode) { hideAutocomplete(); e.preventDefault(); }
+    if (!$("#search-bar").classList.contains("hidden")) { closeSearch(); e.preventDefault(); }
     return;
   }
   if (e.key === "/" && document.activeElement !== $("#input") && !e.ctrlKey && !e.metaKey) {
@@ -101,6 +126,107 @@ function handleGlobalKeydown(e) {
   }
   if ((e.ctrlKey || e.metaKey) && e.key === "n") { e.preventDefault(); createSession(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key === "l") { e.preventDefault(); $("#messages").innerHTML = ""; return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === "f") { e.preventDefault(); openSearch(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === "p") { e.preventDefault(); openPromptLibrary(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); openCommandPalette(); return; }
+}
+
+// ─── Message search ───────────────────────────────────────────────────
+
+let _searchMatches = [];
+let _searchIndex = -1;
+
+function openSearch() {
+  const bar = $("#search-bar");
+  bar.classList.remove("hidden");
+  const input = $("#search-input");
+  input.value = "";
+  input.focus();
+  input.oninput = () => doSearch(input.value);
+  input.onkeydown = (e) => {
+    if (e.key === "Enter") { e.shiftKey ? searchPrev() : searchNext(); e.preventDefault(); }
+    if (e.key === "Escape") { closeSearch(); e.preventDefault(); }
+  };
+  $("#search-prev").onclick = searchPrev;
+  $("#search-next").onclick = searchNext;
+  $("#search-close").onclick = closeSearch;
+}
+
+function closeSearch() {
+  $("#search-bar").classList.add("hidden");
+  clearSearchHighlights();
+  _searchMatches = [];
+  _searchIndex = -1;
+  $("#input").focus();
+}
+
+function doSearch(query) {
+  clearSearchHighlights();
+  _searchMatches = [];
+  _searchIndex = -1;
+  if (!query) { $("#search-count").textContent = ""; return; }
+
+  const messages = $$(".message-text, .thinking-content, .tool-call-detail pre, .tool-call-result");
+  const lower = query.toLowerCase();
+
+  messages.forEach(el => {
+    const text = el.textContent;
+    if (!text.toLowerCase().includes(lower)) return;
+
+    // Highlight matches using a temporary wrapper
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+    textNodes.forEach(node => {
+      const idx = node.textContent.toLowerCase().indexOf(lower);
+      if (idx === -1) return;
+
+      const range = document.createRange();
+      range.setStart(node, idx);
+      range.setEnd(node, idx + query.length);
+
+      const mark = document.createElement("mark");
+      mark.className = "search-highlight";
+      range.surroundContents(mark);
+      _searchMatches.push(mark);
+    });
+  });
+
+  if (_searchMatches.length > 0) {
+    _searchIndex = 0;
+    _searchMatches[0].classList.add("search-active");
+    _searchMatches[0].scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+  $("#search-count").textContent = _searchMatches.length > 0
+    ? `${_searchIndex + 1}/${_searchMatches.length}`
+    : "No results";
+}
+
+function searchNext() {
+  if (_searchMatches.length === 0) return;
+  _searchMatches[_searchIndex].classList.remove("search-active");
+  _searchIndex = (_searchIndex + 1) % _searchMatches.length;
+  _searchMatches[_searchIndex].classList.add("search-active");
+  _searchMatches[_searchIndex].scrollIntoView({ block: "center", behavior: "smooth" });
+  $("#search-count").textContent = `${_searchIndex + 1}/${_searchMatches.length}`;
+}
+
+function searchPrev() {
+  if (_searchMatches.length === 0) return;
+  _searchMatches[_searchIndex].classList.remove("search-active");
+  _searchIndex = (_searchIndex - 1 + _searchMatches.length) % _searchMatches.length;
+  _searchMatches[_searchIndex].classList.add("search-active");
+  _searchMatches[_searchIndex].scrollIntoView({ block: "center", behavior: "smooth" });
+  $("#search-count").textContent = `${_searchIndex + 1}/${_searchMatches.length}`;
+}
+
+function clearSearchHighlights() {
+  document.querySelectorAll(".search-highlight").forEach(mark => {
+    const parent = mark.parentNode;
+    parent.replaceChild(document.createTextNode(mark.textContent), mark);
+    parent.normalize();
+  });
 }
 
 function handleInputKeydown(e) {
@@ -600,6 +726,266 @@ async function confirmCwd() {
   hideCwdDialog();
 }
 
+// ─── Export chat ──────────────────────────────────────────────────────
+
+function exportChat() {
+  const messages = $$(".message");
+  if (messages.length === 0) return;
+
+  let md = `# Claude Code Chat\n\n`;
+  const title = $("#chat-title")?.textContent || "Session";
+  md += `**Session:** ${title}\n`;
+  md += `**Exported:** ${new Date().toLocaleString()}\n\n---\n\n`;
+
+  messages.forEach(msg => {
+    const isUser = msg.classList.contains("user");
+    const bubble = msg.querySelector(".message-bubble");
+    if (!bubble) return;
+
+    if (isUser) {
+      md += `## User\n\n${bubble.dataset.text || bubble.textContent}\n\n`;
+    } else {
+      // Thinking
+      const thinking = msg.querySelector(".thinking-content");
+      if (thinking) {
+        md += `### Thinking\n\n\`\`\`\n${thinking.textContent}\n\`\`\`\n\n`;
+      }
+
+      // Text content
+      const textEl = bubble.querySelector(".message-text");
+      if (textEl) {
+        md += `## Assistant\n\n${textEl.textContent}\n\n`;
+      }
+
+      // Tool calls
+      bubble.querySelectorAll(".tool-call").forEach(tc => {
+        const toolText = tc.querySelector(".tool-call-text")?.textContent || "";
+        md += `#### Tool: ${toolText}\n\n`;
+        const diffLines = tc.querySelectorAll(".diff-line");
+        if (diffLines.length > 0) {
+          md += "```diff\n";
+          diffLines.forEach(l => md += l.textContent + "\n");
+          md += "```\n\n";
+        }
+        const detailPre = tc.querySelector(".tool-call-detail pre");
+        if (detailPre) {
+          md += `\`\`\`json\n${detailPre.textContent}\n\`\`\`\n\n`;
+        }
+      });
+
+      // Result footer
+      const footer = bubble.querySelector(".result-footer");
+      if (footer) {
+        md += `*${footer.textContent}*\n\n`;
+      }
+    }
+    md += "---\n\n";
+  });
+
+  const blob = new Blob([md], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `claude-chat-${title.replace(/\s+/g, "-")}-${Date.now()}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── File drag and drop ───────────────────────────────────────────────
+
+function handleFileDrop(files) {
+  if (!files || files.length === 0) return;
+  const input = $("#input");
+
+  Array.from(files).forEach(file => {
+    // For text files, read content and insert as reference
+    if (file.type.startsWith("text/") || /\.(js|ts|py|rb|go|rs|java|c|cpp|h|hpp|css|html|md|json|yaml|yml|toml|xml|sh|bash|zsh|sql|swift|kt|dart|php|lua|r|jl|ex|exs|erl|hs|ml|scala|clj|lisp|el|vim|conf|cfg|ini|env|dockerfile|makefile)$/i.test(file.name)) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target.result;
+        const prefix = input.value ? input.value + "\n" : "";
+        input.value = `${prefix}@${file.name}\n\`\`\`\n${content}\n\`\`\`\n`;
+        autoResize();
+        input.focus();
+      };
+      reader.readAsText(file);
+    } else {
+      // For non-text files, just insert the filename reference
+      const prefix = input.value ? input.value + " " : "";
+      input.value = `${prefix}@${file.name} `;
+      autoResize();
+      input.focus();
+    }
+  });
+}
+
+// ─── Prompt library ───────────────────────────────────────────────────
+
+function getPrompts() {
+  return JSON.parse(localStorage.getItem("claude_prompts") || "[]");
+}
+
+function openPromptLibrary() {
+  $("#prompt-dialog").classList.remove("hidden");
+  renderPromptList();
+  $("#prompt-name").value = "";
+  $("#prompt-text").value = "";
+}
+
+function renderPromptList() {
+  const prompts = getPrompts();
+  const list = $("#prompt-list");
+  list.innerHTML = "";
+
+  if (prompts.length === 0) {
+    list.innerHTML = '<div class="prompt-empty">No saved prompts yet. Add one below.</div>';
+    return;
+  }
+
+  prompts.forEach((p, i) => {
+    const el = document.createElement("div");
+    el.className = "prompt-item";
+    el.innerHTML = `
+      <div class="prompt-item-name">${escapeHtml(p.name)}</div>
+      <div class="prompt-item-preview">${escapeHtml(p.text.slice(0, 80))}${p.text.length > 80 ? "..." : ""}</div>
+      <div class="prompt-item-actions">
+        <button class="prompt-insert" title="Insert into input">&#128203;</button>
+        <button class="prompt-delete" title="Delete">&times;</button>
+      </div>
+    `;
+    el.querySelector(".prompt-insert").onclick = () => {
+      const input = $("#input");
+      input.value = p.text;
+      input.focus();
+      autoResize();
+      $("#prompt-dialog").classList.add("hidden");
+    };
+    el.querySelector(".prompt-delete").onclick = () => {
+      const prompts = getPrompts();
+      prompts.splice(i, 1);
+      localStorage.setItem("claude_prompts", JSON.stringify(prompts));
+      renderPromptList();
+    };
+    list.appendChild(el);
+  });
+}
+
+function savePrompt() {
+  const name = $("#prompt-name").value.trim();
+  const text = $("#prompt-text").value.trim();
+  if (!name || !text) return;
+
+  const prompts = getPrompts();
+  prompts.push({ name, text });
+  localStorage.setItem("claude_prompts", JSON.stringify(prompts));
+  $("#prompt-name").value = "";
+  $("#prompt-text").value = "";
+  renderPromptList();
+}
+
+// ─── Command palette ──────────────────────────────────────────────────
+
+let _paletteIndex = 0;
+let _paletteItems = [];
+
+function openCommandPalette() {
+  const overlay = $("#command-palette");
+  overlay.classList.remove("hidden");
+  const input = $("#palette-input");
+  input.value = "";
+  input.focus();
+  _paletteIndex = 0;
+  _paletteItems = [];
+  renderPaletteItems();
+
+  input.oninput = () => { _paletteIndex = 0; renderPaletteItems(); };
+  input.onkeydown = (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); paletteMove(1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); paletteMove(-1); }
+    else if (e.key === "Enter") { e.preventDefault(); paletteSelect(); }
+    else if (e.key === "Escape") { closeCommandPalette(); }
+  };
+  overlay.onclick = (e) => { if (e.target === overlay) closeCommandPalette(); };
+}
+
+function closeCommandPalette() {
+  $("#command-palette").classList.add("hidden");
+}
+
+function getPaletteCommands() {
+  const cmds = [
+    { name: "New Session", icon: "+", action: () => createSession() },
+    { name: "Delete Session", icon: "🗑", action: () => deleteCurrentSession() },
+    { name: "Rename Session", icon: "✏", action: () => renameCurrentSession() },
+    { name: "Export Chat", icon: "📄", action: () => exportChat() },
+    { name: "Search Messages", icon: "🔍", action: () => openSearch() },
+    { name: "Prompt Library", icon: "📚", action: () => openPromptLibrary() },
+    { name: "Set Working Directory", icon: "📁", action: () => showCwdDialog() },
+    { name: "Clear Messages", icon: "🧹", action: () => { $("#messages").innerHTML = ""; } },
+    { name: "Help", icon: "❓", action: () => showHelp() },
+    { name: "Status", icon: "📊", action: () => showLocalStatus() },
+    { name: "Scroll to Bottom", icon: "⬇", action: () => { _userScrolledUp = false; scrollToBottom(true); } },
+  ];
+
+  // Add slash commands
+  SLASH_COMMANDS.forEach(c => {
+    cmds.push({
+      name: `/${c.name} — ${c.desc}`,
+      icon: c.icon,
+      action: () => {
+        const input = $("#input");
+        input.value = `/${c.name} `;
+        input.focus();
+      }
+    });
+  });
+
+  return cmds;
+}
+
+function renderPaletteItems() {
+  const query = ($("#palette-input").value || "").toLowerCase();
+  const allCmds = getPaletteCommands();
+
+  _paletteItems = query
+    ? allCmds.filter(c => c.name.toLowerCase().includes(query))
+    : allCmds;
+
+  const list = $("#palette-list");
+  list.innerHTML = "";
+
+  _paletteItems.forEach((cmd, i) => {
+    const el = document.createElement("div");
+    el.className = "palette-item" + (i === _paletteIndex ? " selected" : "");
+    el.innerHTML = `<span class="palette-icon">${cmd.icon}</span><span class="palette-label">${escapeHtml(cmd.name)}</span>`;
+    el.onclick = () => { _paletteIndex = i; paletteSelect(); };
+    el.onmouseenter = () => {
+      list.querySelectorAll(".selected").forEach(s => s.classList.remove("selected"));
+      el.classList.add("selected");
+      _paletteIndex = i;
+    };
+    list.appendChild(el);
+  });
+}
+
+function paletteMove(dir) {
+  if (_paletteItems.length === 0) return;
+  _paletteIndex = (_paletteIndex + dir + _paletteItems.length) % _paletteItems.length;
+  const list = $("#palette-list");
+  list.querySelectorAll(".palette-item").forEach((el, i) => {
+    el.classList.toggle("selected", i === _paletteIndex);
+  });
+  const selected = list.querySelector(".selected");
+  if (selected) selected.scrollIntoView({ block: "nearest" });
+}
+
+function paletteSelect() {
+  if (_paletteItems.length === 0) return;
+  const cmd = _paletteItems[_paletteIndex];
+  closeCommandPalette();
+  if (cmd.action) cmd.action();
+}
+
 // ─── WebSocket ─────────────────────────────────────────────────────────
 
 let _reconnectAttempts = 0;
@@ -831,6 +1217,20 @@ function finishToolBlock(toolUseId, content, isError) {
   resultEl.className = "tool-call-result";
   const truncated = displayContent.length > 2000 ? displayContent.slice(0, 2000) + "\n..." : displayContent;
   resultEl.textContent = truncated;
+
+  // Copy button for full content
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "copy-btn";
+  copyBtn.textContent = "Copy";
+  copyBtn.onclick = (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(displayContent);
+    copyBtn.textContent = "Copied!";
+    setTimeout(() => { copyBtn.textContent = "Copy"; }, 2000);
+  };
+  resultEl.style.position = "relative";
+  resultEl.appendChild(copyBtn);
+
   details.appendChild(resultEl);
   tb.block.appendChild(details);
 }
@@ -917,12 +1317,27 @@ function isNearBottom() {
 function addCopyButtons(container) {
   container.querySelectorAll("pre").forEach((pre) => {
     if (pre.querySelector(".copy-btn")) return;
+
+    // Add line numbers
+    const code = pre.querySelector("code");
+    const text = code ? code.textContent : pre.textContent;
+    const lines = text.split("\n");
+    // Remove trailing empty line if present
+    if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
+
+    if (lines.length > 2) {
+      const gutter = document.createElement("span");
+      gutter.className = "line-numbers";
+      gutter.textContent = lines.map((_, i) => i + 1).join("\n");
+      pre.insertBefore(gutter, pre.firstChild);
+      pre.classList.add("has-line-numbers");
+    }
+
     const btn = document.createElement("button");
     btn.className = "copy-btn";
     btn.textContent = "Copy";
     btn.onclick = () => {
-      const code = pre.querySelector("code");
-      navigator.clipboard.writeText(code ? code.textContent : pre.textContent);
+      navigator.clipboard.writeText(text);
       btn.textContent = "Copied!";
       setTimeout(() => { btn.textContent = "Copy"; }, 2000);
     };
@@ -972,9 +1387,13 @@ function createToolCallEl(name, input) {
   const detail = document.createElement("div");
   detail.className = "tool-call-detail";
   if (input) {
-    const pre = document.createElement("pre");
-    pre.textContent = JSON.stringify(input, null, 2);
-    detail.appendChild(pre);
+    if (name === "Edit" && input.old_string !== undefined) {
+      detail.appendChild(createDiffView(input.old_string, input.new_string || ""));
+    } else {
+      const pre = document.createElement("pre");
+      pre.textContent = JSON.stringify(input, null, 2);
+      detail.appendChild(pre);
+    }
   }
 
   header.onclick = () => {
@@ -985,6 +1404,44 @@ function createToolCallEl(name, input) {
   el.appendChild(header);
   el.appendChild(detail);
   return el;
+}
+
+function createDiffView(oldStr, newStr) {
+  const container = document.createElement("div");
+  container.className = "diff-view";
+
+  const oldLines = oldStr.split("\n");
+  const newLines = newStr.split("\n");
+
+  // Simple line-by-line diff
+  const maxLen = Math.max(oldLines.length, newLines.length);
+  for (let i = 0; i < maxLen; i++) {
+    const oldLine = i < oldLines.length ? oldLines[i] : null;
+    const newLine = i < newLines.length ? newLines[i] : null;
+
+    if (oldLine === newLine) {
+      // Context line
+      const row = document.createElement("div");
+      row.className = "diff-line diff-context";
+      row.textContent = "  " + oldLine;
+      container.appendChild(row);
+    } else {
+      if (oldLine !== null) {
+        const row = document.createElement("div");
+        row.className = "diff-line diff-remove";
+        row.textContent = "- " + oldLine;
+        container.appendChild(row);
+      }
+      if (newLine !== null) {
+        const row = document.createElement("div");
+        row.className = "diff-line diff-add";
+        row.textContent = "+ " + newLine;
+        container.appendChild(row);
+      }
+    }
+  }
+
+  return container;
 }
 
 function getToolIcon(name) {
