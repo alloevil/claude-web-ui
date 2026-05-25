@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Claude Code Web UI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -31,17 +32,52 @@
       <div id="chat-view" class="chat-view hidden">
         <div id="chat-header" class="chat-header">
           <span id="chat-title">Session</span>
-          <button id="btn-delete" class="btn-icon" title="Delete Session">&#128465;</button>
+          <div class="chat-header-actions">
+            <button id="btn-rename" class="btn-icon" title="Rename Session">&#9998;</button>
+            <button id="btn-delete" class="btn-icon" title="Delete Session">&#128465;</button>
+          </div>
         </div>
         <div id="messages" class="messages"></div>
+        <div id="loading-indicator" class="loading-indicator hidden">
+          <div class="loading-dots"><span></span><span></span><span></span></div>
+          <button id="btn-stop" class="btn-stop" title="Stop (Esc)">&#9632; Stop</button>
+        </div>
         <div id="input-area" class="input-area">
-          <textarea id="input" placeholder="Send a message to Claude Code..." rows="1"></textarea>
-          <button id="btn-send" title="Send">&#9654;</button>
+          <div id="input-wrapper" class="input-wrapper">
+            <div id="autocomplete" class="autocomplete-dropdown hidden"></div>
+            <textarea id="input" placeholder="Send a message... (Enter to send, Shift+Enter for newline, / for commands)" rows="1"></textarea>
+          </div>
+          <button id="btn-send" title="Send (Enter)">&#9654;</button>
+        </div>
+        <div id="status-bar" class="status-bar">
+          <span id="status-model" class="status-item status-model" title="Model"></span>
+          <span id="status-context" class="status-item status-context" title="Context usage">
+            <span id="context-bar" class="context-bar"><span id="context-fill" class="context-fill"></span></span>
+            <span id="context-text" class="context-text"></span>
+          </span>
+          <span id="status-session" class="status-item"></span>
+          <span id="status-cost" class="status-item"></span>
+          <span id="status-turns" class="status-item"></span>
+          <span id="status-cwd" class="status-item status-cwd" title="Click to change working directory"></span>
         </div>
       </div>
     </main>
   </div>
 
+  <!-- CWD Dialog -->
+  <div id="cwd-dialog" class="dialog-overlay hidden">
+    <div class="dialog">
+      <h3>Set Working Directory</h3>
+      <input id="cwd-input" type="text" placeholder="/path/to/project" />
+      <div class="dialog-actions">
+        <button id="cwd-cancel" class="btn-secondary">Cancel</button>
+        <button id="cwd-confirm" class="btn-primary">Set</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
