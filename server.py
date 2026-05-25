@@ -144,7 +144,6 @@ async def _handle_chat(ws: WebSocket, session_id: str, user_text: str):
     sdk_session_id = meta.get("sdk_session_id")
 
     if sdk_session_id:
-        # Resume existing SDK session
         options = ClaudeAgentOptions(
             permission_mode="bypassPermissions",
             resume=sdk_session_id,
@@ -152,19 +151,22 @@ async def _handle_chat(ws: WebSocket, session_id: str, user_text: str):
             cwd=str(Path.home()),
         )
     else:
-        # First message: create a new SDK session with our chosen ID
+        # First message: don't pass session_id, let SDK generate it
         options = ClaudeAgentOptions(
             permission_mode="bypassPermissions",
-            session_id=session_id,
             include_partial_messages=True,
             cwd=str(Path.home()),
         )
 
     try:
         async for message in query(prompt=user_text, options=options):
-            # Capture the actual SDK session ID from ResultMessage
+            # Capture the SDK's actual session ID for future resume
             if isinstance(message, ResultMessage) and message.session_id:
                 sessions_meta.setdefault(session_id, {})["sdk_session_id"] = message.session_id
+            elif isinstance(message, SystemMessage) and message.subtype == "init":
+                sid = message.data.get("session_id")
+                if sid:
+                    sessions_meta.setdefault(session_id, {})["sdk_session_id"] = sid
             await _forward_message(ws, message, session_id)
     except Exception as e:
         await ws.send_json({"type": "error", "message": str(e)})
@@ -174,12 +176,9 @@ async def _forward_message(ws: WebSocket, message: Any, session_id: str):
     """Forward an SDK message to the WebSocket client."""
     if isinstance(message, AssistantMessage):
         for block in message.content:
+            # Skip TextBlock — already streamed via StreamEvent text_delta
             if isinstance(block, TextBlock):
-                await ws.send_json({
-                    "type": "text",
-                    "content": block.text,
-                    "session_id": session_id,
-                })
+                pass
             elif isinstance(block, ThinkingBlock):
                 await ws.send_json({
                     "type": "thinking",

@@ -250,16 +250,7 @@ function finishResult(msg) {
   $("#btn-send").disabled = false;
   toolBlocks = {};
 
-  if (msg.result && currentAssistantEl) {
-    const existingText = currentTextEl?.textContent?.trim() || "";
-    if (msg.result.trim() && msg.result.trim() !== existingText) {
-      // The result might be the final accumulated text
-      // Only add if it's different from what we already have
-      if (!existingText.includes(msg.result.trim())) {
-        currentTextEl.textContent = msg.result;
-      }
-    }
-  }
+  // Text was already streamed via text_delta, no need to set from result
 
   // Format any JSON in the message
   if (currentAssistantEl) {
