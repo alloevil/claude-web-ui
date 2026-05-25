@@ -204,40 +204,46 @@ function ensureAssistantMessage() {
 
   const bubble = document.createElement("div");
   bubble.className = "message-bubble";
+  bubble.style.display = "none"; // Hidden until content arrives
   currentAssistantEl.appendChild(bubble);
   $("#messages").appendChild(currentAssistantEl);
+}
 
-  currentTextEl = document.createElement("span");
-  currentTextEl.className = "message-text";
-  bubble.appendChild(currentTextEl);
+function ensureBubble() {
+  ensureAssistantMessage();
+  const bubble = currentAssistantEl.querySelector(".message-bubble");
+  bubble.style.display = "";
+  if (!currentTextEl) {
+    currentTextEl = document.createElement("span");
+    currentTextEl.className = "message-text";
+    bubble.appendChild(currentTextEl);
+  }
+  return bubble;
 }
 
 function appendText(text) {
-  ensureAssistantMessage();
+  ensureBubble();
   currentTextEl.textContent += text;
 }
 
 function appendThinking(text) {
-  ensureAssistantMessage();
-  // Show thinking in a subtle style
+  const bubble = ensureBubble();
   let thinkEl = currentAssistantEl.querySelector(".thinking-block");
   if (!thinkEl) {
     thinkEl = document.createElement("div");
     thinkEl.className = "thinking-block";
     thinkEl.style.cssText = "color: var(--text-muted); font-style: italic; font-size: 12px; padding: 4px 0; border-left: 2px solid var(--border); padding-left: 8px; margin: 4px 0;";
-    const bubble = currentAssistantEl.querySelector(".message-bubble");
     bubble.insertBefore(thinkEl, currentTextEl);
   }
   thinkEl.textContent += text;
 }
 
 function startToolBlock(toolId, name, input) {
-  ensureAssistantMessage();
+  const bubble = ensureBubble();
 
   const el = createToolCallEl(name, input);
   el.dataset.toolId = toolId;
 
-  const bubble = currentAssistantEl.querySelector(".message-bubble");
   bubble.appendChild(el);
   toolBlocks[toolId] = { block: el };
 }
@@ -269,7 +275,8 @@ function finishResult(msg) {
   }
 
   // Add result footer
-  if (currentAssistantEl && msg.cost !== undefined) {
+  if (msg.cost !== undefined) {
+    const bubble = ensureBubble();
     const footer = document.createElement("div");
     footer.className = "result-footer";
     const parts = [];
@@ -277,7 +284,7 @@ function finishResult(msg) {
     if (msg.cost) parts.push(`$${msg.cost.toFixed(4)}`);
     if (msg.subtype) parts.push(msg.subtype);
     footer.textContent = parts.join(" · ");
-    currentAssistantEl.querySelector(".message-bubble").appendChild(footer);
+    bubble.appendChild(footer);
   }
 
   resetCurrent();
